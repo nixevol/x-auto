@@ -269,3 +269,12 @@ metadata:
 ## License
 
 MIT
+
+
+---
+
+## Related
+
+If you find this skill useful, you'll likely also want:
+
+- **[claude-code-dna](https://github.com/huangji6693-max/claude-code-dna)** — The behavioral OS for Claude Code agents. Karpathy 4 laws + 15 operating instincts + memory architecture + curated catalog of 194 skills & 99 agents. Drop-in `~/.claude/` package.
