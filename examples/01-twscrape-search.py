@@ -2,7 +2,7 @@
 Example 01 · twscrape Search
 ============================
 
-用 twscrape 找成人内容方向的 tweet + creator。
+用 twscrape 找 VPN、代理工具和网络隐私方向的 tweet + creator。
 
 依赖：
     pip install twscrape
@@ -94,8 +94,12 @@ async def main():
     out_dir = Path("output")
     out_dir.mkdir(exist_ok=True)
 
-    # 1. 关键词搜索
-    keywords = ["#nsfw lang:en", "#lewd lang:en", "#adult lang:en"]
+    # 覆盖 VPN、代理内核和客户端主题；仍建议人工审核账号后入池。
+    keywords = [
+        "VPN lang:en", "WireGuard lang:en", "OpenVPN lang:en",
+        "Clash Verge lang:en", "V2Ray lang:en", "sing-box lang:en",
+        "Mihomo lang:en", "network privacy lang:en",
+    ]
     all_tweets = []
     for kw in keywords:
         print(f"[*] searching: {kw}")
@@ -104,8 +108,8 @@ async def main():
         print(f"    + {len(tweets)} tweets")
     (out_dir / "tweets.json").write_text(json.dumps(all_tweets, indent=2))
 
-    # 2. 收割 creator
-    hashtags = ["nsfw", "lewd"]
+    # 收集主题账号
+    hashtags = ["VPN", "WireGuard", "OpenVPN", "ClashVerge", "V2Ray", "singbox"]
     all_creators = {}
     for h in hashtags:
         print(f"[*] mining creators from #{h}")

@@ -1,4 +1,4 @@
-# X NSFW Warmup Skill — docker-compose
+# X VPN / proxy topic warmup — docker-compose
 #
 # Quick start:
 #   cp deploy/.env.example .env && nano .env   # 填好敏感配置

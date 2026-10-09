@@ -53,7 +53,7 @@ def fmt_ts(ts) -> str:
 # ============================================================================
 def render_dashboard():
     with ui.column().classes("w-full gap-4"):
-        ui.label("🦞 X 养号 · 仪表盘").classes("text-2xl font-bold")
+        ui.label("X 养号 · VPN / 代理工具").classes("text-2xl font-bold")
 
         counters = {}
         with ui.row().classes("w-full gap-4"):
@@ -242,12 +242,22 @@ def render_settings():
 
         with ui.card().classes("w-full"):
             ui.label("点赞概率").classes("text-lg font-bold")
-            ui.label("每次滚动时有多大概率点赞（只点赞成人内容）")
+            ui.label("每次滚动时有多大概率评估推文（只点赞 VPN / 代理工具相关内容）")
             like_slider = ui.slider(
                 min=0.0, max=0.5, step=0.01,
                 value=float(settings.get("like_probability", "0.03")),
             ).props("label-always")
             like_slider.on_value_change(lambda e: db.set_setting("like_probability", str(e.value)))
+
+        with ui.card().classes("w-full"):
+            ui.label("VPN / 代理主题筛选").classes("text-lg font-bold")
+            ui.label("内置 VPN、WireGuard、Clash Verge、V2Ray、sing-box、Mihomo 等；Clash 需要代理语境。")
+            keywords = ui.textarea(
+                label="附加关键词（换行或逗号分隔）",
+                value=settings.get("topic_keywords", ""),
+                placeholder="填写你运营的品牌或产品名称；留空使用内置规则",
+            ).classes("w-full")
+            keywords.on_value_change(lambda e: db.set_setting("topic_keywords", e.value or ""))
 
         with ui.card().classes("w-full"):
             ui.label("同时运行数").classes("text-lg font-bold")

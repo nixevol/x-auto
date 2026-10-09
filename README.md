@@ -1,280 +1,64 @@
-# x-nsfw-warmup-skill 🦞
+# X VPN / 代理工具运营技能包
 
-> **Universal AI-assistant skill** —— X (Twitter) 成人内容方向养号自动化全套开源工具集合
->
-> ✅ Works with **OpenClaw** (drop into `~/.openclaw/skills/`)
-> ✅ Works with **Claude Code** (drop into `~/.claude/skills/`)
-> ✅ Works with **Cursor / Windsurf / LobeChat / any markdown-aware AI tool**
->
-> 把指纹浏览器编排、内容采集、NSFW 自动识别、拟人化养号循环这四件事，
-> 用 30+ 个被验证的开源 repo 拼成一条可跑的流水线。
+面向 X（Twitter）上的 VPN、网络隐私和代理工具内容运营，保留账号池、指纹浏览器、内容来源和运行循环的 X 框架。主题涵盖 **VPN、WireGuard、OpenVPN、Clash、Clash Verge、V2Ray、sing-box、Mihomo、Xray、Shadowsocks**，适合整理版本更新、配置教程、故障排查和工具比较。
 
----
+仓库目录及 GitHub 地址保留历史名称，不代表当前内容方向。
 
-## ⚠️ 运行前务必阅读 · 使用即视为已同意
+## 入口
 
-- **违反 X / Twitter ToS**：平台明令禁止"automated use"与"bulk interactions"，
-  运行本项目可能导致限流、封号、关联资产被封。
-- **仅支持 cookie 认证**：项目**不存密码**，老版本数据库升级时会自动把
-  `accounts.password` 列清空并废弃。
-- **数据是明文**：cookies / 代理凭据明文落盘，请用磁盘加密 + 可信设备。
-- **不挂 docker.sock**：已移除 Watchtower，禁止把 `/var/run/docker.sock`
-  挂给任何本仓库外的镜像（容器逃逸风险）。
-- **禁止骚扰、挂人、深度伪造、未成年人内容**。详见 [LICENSE](./LICENSE) 第 4 条。
-- 地区合规由使用者自负。中国大陆使用者特别注意：**传播即违法**。
-- **首次触发 NSFW 识别会联网下载 NudeNet 模型（约 80MB）**：模型文件
-  来自 `huggingface.co`，缓存在 `~/.NudeNet/`（Linux/Mac）或
-  `%USERPROFILE%\.NudeNet\`（Windows）。首次启动面板或首次 live 运行时
-  会触发一次，国内网络需要代理。之后无须再下载。
+- [QUICKSTART.md](./QUICKSTART.md)：安装和模拟运行。
+- [gui/README.md](./gui/README.md)：本地可视化面板。
+- [SKILL.md](./SKILL.md)：AI 助手加载入口。
+- [AI-AGENT-PLAYBOOK.md](./AI-AGENT-PLAYBOOK.md)：执行边界和验证要求。
+- [tools-catalog.md](./tools-catalog.md)：X 工具与主题参考项目。
+- [deploy/README.md](./deploy/README.md)：部署配置核对及已知限制。
 
----
+## 快速开始
 
-## 🦞 GUI 模式（最简单，推荐给非技术朋友）
-
-如果你只想要**正常刷 X + 偶尔点赞**，并且想用**网页面板**改频率和号池，跳过下面的命令行流程，直接看：
-
-👉 [**gui/README.md**](./gui/README.md)
+以下 Bash 命令在 macOS / Linux 或 Windows WSL2 中执行；先阅读安装脚本。
 
 ```bash
-bash scripts/install.sh           # 一键装（同 v0.4）
-bash scripts/launch_gui.sh        # 启动 localhost:8080 控制面板
-```
-
-之后浏览器里所有事都能点：
-
-- **Dashboard 标签** · 看实时日志、点 ▶ Start / ■ Stop
-- **Accounts 标签** · 加号、删号、改备注
-- **Settings 标签** · 拖滑条改频率、改 like 概率、切 dry-run
-- **AdsPower 标签** · 一键测连接、批量导入 profile
-
-GUI 模式只跑两个动作 —— **scroll_engage**（刷 feed + 偶尔点赞）和 **idle**（挂机）。
-不发推、不关注、不取关，是最低风险的"养号常态"模式。
-
----
-
-## ⚡ 最短路径（已有账号 + 指纹浏览器的用户）
-
-如果你**已经有 X 账号**，并且**已经在 AdsPower / BitBrowser 里创建了 profile 并登录过**，从零到 dry-run 只要 3 条命令：
-
-```bash
-# 1. 克隆仓库（不使用 curl|bash 方式 — 请先本地审阅 install.sh 再执行）
-git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill.git \
-    ~/.openclaw/workspace/skills/x-nsfw-warmup   # 或 ~/.claude/skills/x-nsfw-warmup
-
-# 2. 进入目录，审阅脚本后再运行安装
-cd ~/.openclaw/workspace/skills/x-nsfw-warmup
-less scripts/install.sh                    # 过一遍脚本内容
-bash scripts/install.sh                    # 装依赖 + 建 venv
+git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill.git
+cd x-nsfw-warmup-skill
+bash scripts/install.sh
 source .venv/bin/activate
-
-# 3. 跑 onboarding 向导
-python scripts/onboard.py
+pip install -r gui/requirements.txt
+bash scripts/launch_gui.sh
 ```
 
-> ⚠️ 不要用 `curl … | bash` 直接远程执行。请先 clone、审阅、再本地运行。
+面板地址为 `http://localhost:8080`。先保持 dry-run，导入自己有权运营的账号。命令行账号导入入口是 `scripts/onboard.py`，完整循环演练入口是 `python examples/05-full-warmup-loop.py --dry-run`。
 
-向导会：
+GUI 只执行 **scroll_engage（刷 X 首页 + 主题相关内容的可选点赞）和 idle**；不会新增主题搜索动作，也不负责采集、发帖、关注或取关。模拟运行并不证明真实平台操作可用。
 
-1. 自动连你的 AdsPower / BitBrowser Local API
-2. 列出你现有的 profile
-3. 让你确认要导入哪些
-4. 让你填每个 profile 对应的 X handle
-5. 把一切写进 warmup.db
-6. 告诉你下一步跑什么命令
+## 主题迁移约定与实现状态
 
-**大约 5 分钟**，之后 dry-run 就能跑。往下走再根据 [deploy/README.md](./deploy/README.md) 切 live。
+本轮文档定义以下目标；使用前应核对代码是否已完成迁移，不能把这些约定当成现有版本已经实现的能力。
 
----
+- 新增 `topic.py`，接口为 `match_topic(text, extra_keywords=()) -> TopicMatch(relevant, score, matched_terms)`。
+- 内置默认强关键词；只有命中强词且 `score >= 2` 才判为相关。通用词如“网络”“速度”“安全”不能单独触发相关判断。
+- GUI 新增 `topic_keywords` 配置，用于补充主题词；不把关键词配置解释成搜索功能。
+- 新示例 `examples/02-topic-classify.py` 替代旧分类器，面向文本及 `--file` 文件输入；具体参数以最终实现为准。
+- 完整循环素材表保留旧 `content_level` 字段，新增 `topic_score`。旧数据不能自动标为 VPN 素材，也不能靠旧字段进入发布池。
+- 发帖仅选择 **`topic_score >= 2`、具有真实非空 `caption` 记录、来源及发布授权已核实**的素材。没有符合条件的记录就跳过，不能用随机文案补齐。
+- `examples/04-gallery-dl-batch.sh` 保留，使用范围仅为有授权的 X 媒体。
 
----
+## 工作流和现有示例
 
-## 它解决什么
-
-成人内容方向的 X 账号运营有两个工程难点：
-
-1. **指纹浏览器没法控制** —— AdsPower / BitBrowser 都有 Local API，但文档分散
-2. **没法自动识别成人内容** —— 简单的 sfw/nsfw 二分类不够，需要 18 种细粒度标签
-
-这个 skill 给出了**端到端**的开源解决方案，每一步都有现成 repo，不用从 0 写。
-
----
-
-## 安装方式（任选一种）
-
-### 🦞 OpenClaw 用户
-
-```bash
-# 方式 A · 直接 clone 到 OpenClaw skills 目录
-mkdir -p ~/.openclaw/skills
-git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill ~/.openclaw/skills/x-nsfw-warmup
-
-# 方式 B · 在 OpenClaw 对话里直接粘 GitHub 链接（最快）
-# 在任何 OpenClaw 接入的聊天渠道（WhatsApp / Telegram / Slack / 微信 / 飞书…）发：
-# "use https://github.com/huangji6693-max/x-nsfw-warmup-skill"
-# 它会自动 clone + 注册 + 装依赖
-
-# 方式 C · 通过 ClawHub 安装（如果已发布到 registry）
-clawhub install huangji6693-max/x-nsfw-warmup
-```
-
-安装后重启 OpenClaw gateway，问它 "帮我搭一套 X 养号" 就会自动唤起这个 skill。
-
-### 🤖 Claude Code 用户
-
-```bash
-mkdir -p ~/.claude/skills
-git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill ~/.claude/skills/x-nsfw-warmup
-```
-
-下次 Claude Code 启动时自动加载。
-
-### 🛠 其他工具（Cursor / Windsurf / LobeChat / 网页 ChatGPT / Claude.ai）
-
-```bash
-# 直接 clone 看 markdown
-git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill
-cd x-nsfw-warmup-skill
-
-# 把 SKILL.md + 任何一个 workflow 文件复制粘贴到对话框作上下文
-cat SKILL.md workflows/04-warmup-loop.md
-```
-
-### 直接跑代码（不依赖任何 AI 客户端）
-
-```bash
-git clone https://github.com/huangji6693-max/x-nsfw-warmup-skill
-cd x-nsfw-warmup-skill
-
-pip install -r requirements.txt
-playwright install chromium
-
-python examples/02-nudenet-classify.py path/to/image.jpg
-bash examples/04-gallery-dl-batch.sh
-```
-
----
-
-## 文件结构
-
-```
-x-nsfw-warmup-skill/
-├── SKILL.md                  # 主 skill 文件（Claude Code 调用入口）
-├── README.md                 # 你正在看
-├── tools-catalog.md          # 完整工具目录（30+ repo + stars + 用途）
-├── workflows/
-│   ├── 01-account-setup.md       # 账号池 + 指纹 + 代理准备
-│   ├── 02-content-sourcing.md    # twscrape 找成人内容源
-│   ├── 03-nsfw-classification.md # NudeNet 自动分类
-│   └── 04-warmup-loop.md         # 养号循环编排
-├── examples/
-│   ├── 01-twscrape-search.py     # 关键词搜索 + 用户时间线
-│   ├── 02-nudenet-classify.py    # NudeNet 图片分类
-│   ├── 03-adspower-control.py    # AdsPower API 启停 profile
-│   ├── 04-gallery-dl-batch.sh    # gallery-dl 批量下载
-│   └── 05-full-warmup-loop.py    # 串起来的完整 demo
-├── requirements.txt
-└── LICENSE
-```
-
----
-
-## 核心 repo 速查
-
-### 指纹浏览器（L2）
-| repo | stars | 一句话 |
+| 阶段 | 文档 | 现有代码入口 |
 |---|---|---|
-| [CryptoBusher/Adspower-twitter-warmup](https://github.com/CryptoBusher/Adspower-twitter-warmup) | 76 | **完整养号框架**，作者实测 8 个月 0.12% 封号率 |
-| [AdsPower/localAPI](https://github.com/AdsPower/localAPI) | 107 | AdsPower 官方 Local API |
-| [itbrowser-net/undetectable-fingerprint-browser](https://github.com/itbrowser-net/undetectable-fingerprint-browser) | 504 | 免费开源 Multilogin 替代品 |
-| [Kaliiiiiiiiii-Vinyzu/patchright-python](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python) | 1269 | undetected Playwright |
-| [Vinyzu/Botright](https://github.com/Vinyzu/Botright) | 960 | undetected + 改指纹 + 解 captcha 三合一 |
-| [botswin/BotBrowser](https://github.com/botswin/BotBrowser) | 2319 | 自带绕 Cloudflare / Akamai |
+| 账号与 profile | [01-account-setup](./workflows/01-account-setup.md) | `scripts/onboard.py`、`scripts/add_account.py` |
+| 主题来源与授权 | [02-content-sourcing](./workflows/02-content-sourcing.md) | `examples/01-twscrape-search.py`、`examples/04-gallery-dl-batch.sh` |
+| 文本主题评分 | [03-topic-classification](./workflows/03-nsfw-classification.md) | 迁移目标：`topic.py` 和新 02 示例 |
+| 循环与发布门槛 | [04-warmup-loop](./workflows/04-warmup-loop.md) | `examples/05-full-warmup-loop.py` |
 
-### 内容源（L3）
-| repo | stars | 一句话 |
-|---|---|---|
-| [vladkens/twscrape](https://github.com/vladkens/twscrape) | 2330 | **2025 还在更**的 X scraper，带授权 |
-| [JustAnotherArchivist/snscrape](https://github.com/JustAnotherArchivist/snscrape) | 5327 | 老牌社交平台 scraper |
-| [Altimis/Scweet](https://github.com/Altimis/Scweet) | 1303 | 推特无 API key scraper |
-| [mahrtayyab/tweety](https://github.com/mahrtayyab/tweety) | 651 | 推特 scraper Python |
-| [mikf/gallery-dl](https://github.com/mikf/gallery-dl) | 17686 | **300+ 站点通用下载器** |
-| [AAndyProgram/SCrawler](https://github.com/AAndyProgram/SCrawler) | 1998 | Twitter / Reddit / OF / Insta 通杀 |
-| [datawhores/OF-Scraper](https://github.com/datawhores/OF-Scraper) | 1017 | OnlyFans 现役维护最活跃 |
-| [Ljzd-PRO/KToolBox](https://github.com/Ljzd-PRO/KToolBox) | 535 | Kemono 高定制下载 |
-| [mmpx12/twitter-media-downloader](https://github.com/mmpx12/twitter-media-downloader) | 864 | `twmd` Go CLI |
+第 03 个工作流保留历史文件名以维持入口可用，正文已改为主题分类。浏览器控制示例位于 `examples/03-adspower-control.py`。
 
-### NSFW 识别（L3）
-| repo | stars | 一句话 |
-|---|---|---|
-| [notAI-tech/NudeNet](https://github.com/notAI-tech/NudeNet) | 2314 | **业界标准**，18 种细粒度标签 |
-| [vladmandic/nudenet](https://github.com/vladmandic/nudenet) | 320 | TFJS / NodeJS 版 |
-| HuggingFace `Falconsai/nsfw_image_detection` | - | ViT 模型几 MB，CPU 可跑 |
+## 使用边界
 
-### 养号编排（L4）
-| repo | stars | 一句话 |
-|---|---|---|
-| [CryptoBusher/Adspower-twitter-warmup](https://github.com/CryptoBusher/Adspower-twitter-warmup) | 76 | 主框架，已写好 5 类拟人化行为 |
-| [nirholas/XActions](https://github.com/nirholas/XActions) | 189 | X 自动化全套工具 + MCP server |
+仅操作自己有权管理的账号和素材，遵守 X 的自动化、内容和反垃圾规则以及当地法规。主题匹配不证明教程准确、服务安全或具备转载授权；不要发布“绝对匿名”“保证速度”等未经验证的承诺。代理软件仅作为内容主题，本仓库不安装或配置 VPN 服务。
 
----
+cookies、代理凭据及数据库可能明文保存，应限制本地访问；不要提交凭据或把未鉴权面板暴露到公网。部署前备份数据库，迁移后先做本地验证。本次文档修改不执行真实平台操作。
 
-## 它为什么是一个"通用 AI skill"
+## 许可证
 
-`SKILL.md` 顶部的 frontmatter 同时声明了 **OpenClaw** 和 **Claude Code** 两套元数据：
-
-```yaml
----
-name: x-nsfw-warmup
-description: Use when user wants to build, debug, or scale an X (Twitter) account farm focused on adult / NSFW content...
-metadata:
-  openclaw:
-    emoji: 🦞
-    requires:
-      bins: [python3, pip]
-    install:
-      - id: pip-deps
-        kind: pip
-        module: -r requirements.txt
-      - id: playwright-chromium
-        kind: shell
-        command: playwright install chromium
-  claude-code:
-    type: knowledge-skill
-    auto-load-on:
-      - "推特养号"
-      - "twitter warmup"
-      - "AdsPower"
----
-```
-
-任意一个 AI 客户端加载后就能：
-
-- 知道用哪个 repo 解决哪个具体痛点
-- 直接参照 `examples/` 里跑得通的代码
-- 按 `workflows/` 的顺序帮用户搭起完整流水线
-- 自动 `pip install -r requirements.txt`（OpenClaw 会读 install 块自动跑）
-- 不需要现场 Google，也不会推荐过时 repo
-
----
-
-## ⚠️ 风险声明
-
-- 自动化行为**违反 X ToS**，封号是常态
-- 仅适用于**法律允许成人内容的司法辖区**
-- **不要**用于：未成年内容、deepfake、未经同意私照、骚扰
-- 商业化请咨询律师
-
----
-
-## License
-
-MIT
-
-
----
-
-## Related
-
-If you find this skill useful, you'll likely also want:
-
-- **[claude-code-dna](https://github.com/huangji6693-max/claude-code-dna)** — The behavioral OS for Claude Code agents. Karpathy 4 laws + 15 operating instincts + memory architecture + curated catalog of 194 skills & 99 agents. Drop-in `~/.claude/` package.
+以 [LICENSE](./LICENSE) 原文为准，本轮不修改许可证。

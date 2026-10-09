@@ -93,7 +93,6 @@ def check_python_deps():
     deps = [
         ("requests", "requests"),
         ("playwright", "playwright.sync_api"),
-        ("nudenet", "nudenet"),
         ("twscrape", "twscrape"),
     ]
     for name, import_name in deps:
@@ -124,17 +123,6 @@ def check_playwright_browser():
              "Run: playwright install chromium")
 
 
-def check_nudenet():
-    section("NudeNet")
-    try:
-        from nudenet import NudeDetector
-        d = NudeDetector()
-        ok("nudenet", "model loaded successfully")
-    except ImportError:
-        fail("nudenet", "nudenet not installed", "pip install nudenet")
-    except Exception as e:
-        warn("nudenet", f"model load failed: {e}",
-             "First run downloads the model (~80MB), check internet")
 
 
 def check_adspower():
@@ -267,7 +255,7 @@ def check_skill_files():
         "AI-AGENT-PLAYBOOK.md",
         "requirements.txt",
         "examples/05-full-warmup-loop.py",
-        "examples/02-nudenet-classify.py",
+        "examples/02-topic-classify.py",
         "workflows/01-account-setup.md",
     ]
     missing = [f for f in required if not Path(f).exists()]
@@ -314,7 +302,6 @@ def main():
     check_venv()
     check_python_deps()
     check_playwright_browser()
-    check_nudenet()
     check_adspower()
     check_skill_files()
     check_warmup_db()

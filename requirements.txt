@@ -6,7 +6,6 @@
 
 # Core
 twscrape==0.17.0          # X / Twitter scraper with auth
-nudenet==3.4.2            # NSFW classification (18 labels)
 gallery-dl==1.29.7        # Universal media downloader (300+ sites)
 
 # Browser automation

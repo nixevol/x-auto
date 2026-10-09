@@ -287,7 +287,7 @@ def step_write_db(db_path: Path, accounts: list[FingerprintProfile]) -> int:
             handle TEXT PRIMARY KEY,
             followers INTEGER,
             bio TEXT,
-            nsfw_score REAL,
+            topic_score REAL NOT NULL DEFAULT 0,
             follow_priority INTEGER DEFAULT 5,
             discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -295,8 +295,10 @@ def step_write_db(db_path: Path, accounts: list[FingerprintProfile]) -> int:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             local_path TEXT UNIQUE,
             content_level INTEGER,
-            nsfw_labels TEXT,
+            topic_score REAL NOT NULL DEFAULT 0,
+            caption TEXT,
             posted_count INTEGER DEFAULT 0
+        );
         );
         CREATE TABLE IF NOT EXISTS follow_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -362,8 +364,7 @@ def print_next_steps(repo_root: Path, total_accounts: int):
     print(f"  {BLUE}3.{RESET} Add creators (optional, improves warmup quality):")
     print(f"     python scripts/seed_creators.py --from-file handles.txt")
     print()
-    print(f"  {BLUE}4.{RESET} Add media items (optional; needed for post_tweet action):")
-    print(f"     python examples/02-nudenet-classify.py path/to/media/dir")
+    print(f"     先用 examples/02-topic-classify.py 审核 VPN / 代理主题文本，再将 topic_score >= 2 的素材入库")
     print()
     print(f"  {BLUE}5.{RESET} When you're READY to go live:")
     print(f"     {YELLOW}cp deploy/.env.example .env{RESET}")

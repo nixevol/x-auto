@@ -1,19 +1,12 @@
 """
-X Warmup Skill · GUI mode
+X VPN / 代理主题 GUI。
 
-A local, visual control panel for users who just want to run a simple
-scroll-and-like warmup loop on their existing X accounts, without
-touching the command line for day-to-day operation.
-
-Architecture:
-    gui/db.py         shared SQLite schema + query helpers
-    gui/adspower.py   AdsPower Local API wrapper with dry-run support
-    gui/engine.py     background scheduler + simplified 2-action set
-    gui/app.py        NiceGUI web panel (localhost:8080)
+面板面向已有 X 账号与浏览器 profile，日常只运行刷首页、可选点赞和 idle。
+主题关键词配置用于内容相关性设置，不产生搜索、采集或发帖动作。
 
 Run with:
     cd gui && python app.py
     # or: bash scripts/launch_gui.sh
 """
 
-__version__ = "0.5.0-gui"
+__version__ = "0.6.0-gui"

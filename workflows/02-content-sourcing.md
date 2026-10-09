@@ -1,241 +1,34 @@
-# Workflow 02 · Content Sourcing
+# Workflow 02 · VPN / 代理主题来源
 
-> 给养号循环喂内容。两个目标：找**待关注的成人 creator** + 找**可发布的素材**。
+目标是整理 VPN 与代理工具主题的文本及有授权的 X 媒体。主题包括 VPN、WireGuard、OpenVPN、Clash、Clash Verge、V2Ray、sing-box、Mihomo、Xray、Shadowsocks。GUI 不执行主题搜索；本流程也不把外部采集能力描述成已授权。
 
----
+## 来源记录
 
-## 数据流
+记录原始 X URL、作者、抓取时间、版本或配置上下文、caption、授权证据和文本内容。`examples/01-twscrape-search.py` 仅是现有搜索入口，运行会连接外部服务，不能在文档验证时执行。
 
-```
-关键词 / hashtag / seed creator
-        │
-        ▼
-┌────────────────────┐
-│  twscrape          │ 找推文 + 找用户
-│  snscrape          │
-│  Scweet            │
-└────────────────────┘
-        │
-        ▼ tweet_ids[], user_handles[]
-┌────────────────────┐
-│  gallery-dl        │ 拉媒体到本地
-│  twmd / SCrawler   │
-└────────────────────┘
-        │
-        ▼ images/*.jpg, videos/*.mp4
-┌────────────────────┐
-│  NudeNet           │ 自动打标签 + 评分
-└────────────────────┘
-        │
-        ▼ classified_media.db
-┌────────────────────┐
-│  发布池 / 关注池    │
-└────────────────────┘
-```
+`examples/04-gallery-dl-batch.sh` 保留但只允许下载用户有权使用的 X 媒体。下载许可、编辑许可和 X 发布许可分别核实；不要使用其他站点、私密内容或未授权转载。
 
----
+## 主题候选示例
 
-## Step 1 · 用 twscrape 找候选推文
+- 协议与实现：WireGuard、OpenVPN、V2Ray、sing-box、Mihomo、Xray、Shadowsocks。
+- 客户端与规则：Clash、Clash Verge、路由、DNS、配置迁移。
+- 教程与排错：安装、版本更新、连接失败、密钥与 peer 配置。
 
-[twscrape](https://github.com/vladkens/twscrape) ⭐2330 是 2025 年最活跃的 X scraper。
+不要把“最快”“绝对匿名”“永久可用”等未经测试的承诺写入 caption。注明版本、测试环境和限制。
 
-### 安装
+## 主题评分迁移
 
-```bash
-pip install twscrape
-```
+计划使用 `topic.py` 的 `match_topic(text, extra_keywords=()) -> TopicMatch(relevant, score, matched_terms)`。内置强词命中且 `score >= 2` 才相关，泛词不能单独放行。GUI 的 `topic_keywords` 只是补充词配置，不会触发搜索。
 
-### 加号（用于授权 scraping，不会消耗你的养号池）
+## 数据字段
 
-```python
-import asyncio
-from twscrape import API
+完整循环素材表保留旧 `content_level`，新增 `topic_score`。旧记录不自动赋分；必须有真实文本重新评分。进入发布池前还必须有真实非空 `caption` 和授权证据。
 
-async def main():
-    api = API()
-    # 用一些一次性账号专门做 scraping，不要混用养号池
-    await api.pool.add_account("scraper_user1", "password1", "email1", "email_pass1")
-    await api.pool.add_account("scraper_user2", "password2", "email2", "email_pass2")
-    await api.pool.login_all()
+## 完成标准
 
-asyncio.run(main())
-```
+- [ ] 每项素材有原始 X 来源和授权记录。
+- [ ] 文本、版本和测试环境可追溯。
+- [ ] 主题评分完成且达到门槛。
+- [ ] 不使用随机 caption 填空。
 
-### 关键词 / hashtag 搜索
-
-```python
-async def search_nsfw(api, keyword, limit=200):
-    results = []
-    async for tweet in api.search(f"{keyword} filter:media -filter:retweets", limit=limit):
-        if tweet.media and len(tweet.media.photos) > 0:
-            results.append({
-                "id": tweet.id,
-                "user": tweet.user.username,
-                "text": tweet.rawContent,
-                "media_urls": [p.url for p in tweet.media.photos],
-                "likes": tweet.likeCount,
-                "retweets": tweet.retweetCount,
-            })
-    return results
-
-# 用法
-tweets = await search_nsfw(api, "#nsfw lang:en", limit=500)
-```
-
-### 找 creator
-```python
-async def list_creators_who_engage(api, hashtag, limit=300):
-    """从一个 hashtag 收割活跃 creator"""
-    creators = {}
-    async for tweet in api.search(f"#{hashtag}", limit=limit):
-        u = tweet.user
-        if u.followersCount > 1000 and u.statusesCount > 100:
-            creators[u.username] = {
-                "handle": u.username,
-                "followers": u.followersCount,
-                "tweets": u.statusesCount,
-                "verified": u.verified,
-                "bio": u.rawDescription,
-            }
-    return list(creators.values())
-```
-
-完整可运行版本见 [`examples/01-twscrape-search.py`](../examples/01-twscrape-search.py)。
-
----
-
-## Step 2 · 拉媒体到本地
-
-### gallery-dl（推荐）
-
-```bash
-pip install gallery-dl
-```
-
-支持的 URL 格式（直接喂就行）：
-
-```bash
-# 单条推文
-gallery-dl "https://x.com/USERNAME/status/123456789"
-
-# 整个用户的所有媒体
-gallery-dl "https://x.com/USERNAME/media"
-
-# Coomer / Kemono
-gallery-dl "https://coomer.su/onlyfans/user/USERNAME"
-gallery-dl "https://kemono.su/patreon/user/12345"
-
-# Reddit subreddit
-gallery-dl "https://www.reddit.com/r/SUBREDDIT/"
-```
-
-### 配置 cookie（避免触发限流）
-
-`~/.config/gallery-dl/config.json`:
-
-```json
-{
-  "extractor": {
-    "twitter": {
-      "cookies": "/path/to/twitter-cookies.txt",
-      "videos": true,
-      "include": "media",
-      "filename": "{user[name]}_{tweet_id}_{num}.{extension}",
-      "directory": ["twitter", "{user[name]}"]
-    },
-    "coomer": {
-      "filename": "{username}_{id}_{filename}.{extension}",
-      "directory": ["coomer", "{service}", "{username}"]
-    }
-  }
-}
-```
-
-### twmd（轻量替代）
-
-```bash
-# 安装：https://github.com/mmpx12/twitter-media-downloader
-twmd -u USERNAME -i -v -o /tmp/dl    # 下载用户所有图+视频
-```
-
-完整批量脚本见 [`examples/04-gallery-dl-batch.sh`](../examples/04-gallery-dl-batch.sh)。
-
----
-
-## Step 3 · 候选 creator 入库
-
-```sql
-CREATE TABLE creators (
-    handle TEXT PRIMARY KEY,
-    followers INTEGER,
-    tweets INTEGER,
-    verified BOOLEAN,
-    bio TEXT,
-    discovered_via TEXT,        -- 哪个 hashtag 发现的
-    nsfw_score REAL,             -- 后续 NudeNet 反向打分
-    follow_priority INTEGER DEFAULT 5,  -- 1-10
-    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE media_items (
-    id INTEGER PRIMARY KEY,
-    source_tweet_id TEXT,
-    source_creator TEXT,
-    local_path TEXT,
-    nsfw_labels TEXT,            -- JSON: ["FEMALE_BREAST_EXPOSED", ...]
-    nsfw_max_score REAL,
-    is_safe_to_post INTEGER DEFAULT 0,  -- 0 = 待审, 1 = 可发, -1 = 拒绝
-    posted_count INTEGER DEFAULT 0
-);
-```
-
----
-
-## Step 4 · 反向打分 creator（用 NudeNet）
-
-```python
-from nudenet import NudeDetector
-detector = NudeDetector()
-
-def score_creator(handle, sample_images):
-    """对 creator 抽样的图片做 NSFW 打分，给 creator 整体打 0-1 分"""
-    nsfw_count = 0
-    for img in sample_images:
-        results = detector.detect(img)
-        if any(r["score"] > 0.5 for r in results if "EXPOSED" in r["class"]):
-            nsfw_count += 1
-    return nsfw_count / len(sample_images) if sample_images else 0
-
-# 阈值过滤
-creators_to_follow = [c for c in creators if score_creator(c["handle"], samples) > 0.3]
-```
-
-详见 [03-nsfw-classification.md](./03-nsfw-classification.md)。
-
----
-
-## Step 5 · 输出给 L4 养号循环
-
-养号循环的输入：
-
-```python
-{
-    "creators_to_follow_random": ["@user1", "@user2", ...],   # 随机关
-    "creators_to_follow_required": ["@vip_user1", ...],        # 必关
-    "media_to_post": [
-        {"path": "/data/img1.jpg", "caption": "Late night vibes 🌙"},
-        ...
-    ]
-}
-```
-
----
-
-## ✅ 完成标志
-
-- [ ] 至少 50 个 creator 已入库且打过分
-- [ ] 至少 200 张图 / 50 个视频已下载且过 NudeNet
-- [ ] 发布池有 7 天的内容缓冲量
-- [ ] 关注池区分 random / required
-
-完成后进入 [03-nsfw-classification.md](./03-nsfw-classification.md)。
+下一步进入保留历史路径的 [03-nsfw-classification.md](./03-nsfw-classification.md)。

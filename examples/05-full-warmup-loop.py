@@ -2,7 +2,7 @@
 Example 05 · Full Warmup Loop (Demo)
 ====================================
 
-把前 4 步的产出（账号池 + creator 池 + 媒体池 + 等级标签）串成一条**完整的拟人化养号循环**。
+这是一个 VPN / 代理工具主题运营 demo：账号池 + 主题账号池 + 已审核素材池。
 
 这是一个 demo 骨架，**不能直接 production 用**，但所有关键组件已就位：
 - AdsPower 启停
@@ -22,13 +22,10 @@ Example 05 · Full Warmup Loop (Demo)
     真实跑。要求用户已经自己装好 AdsPower、配好 profile、填好账号池数据库。
     AI 助手不应在聊天里启动 live 模式 —— 应由用户自己 cron / systemd 调度。
 
-依赖：
-    pip install requests playwright nudenet
-    playwright install chromium
+    pip install requests playwright twscrape gallery-dl
 
 参考主框架：https://github.com/CryptoBusher/Adspower-twitter-warmup
 """
-
 import argparse
 import asyncio
 import json
@@ -39,6 +36,8 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from topic import ensure_topic_schema, match_topic
 
 # 重 import 在 dry-run 模式下不强制要求，避免 AI 助手在聊天里 walk-through 时缺包失败
 try:
@@ -209,42 +208,32 @@ async def health_check(page: Page) -> str:
     return "ok"
 
 
-# ========== 5 类拟人化动作 ==========
 async def action_post_tweet(page: Page, account: dict, db: sqlite3.Connection):
-    """从媒体池抽一张图发推"""
-    cur = db.execute(
-        "SELECT id, local_path FROM media_items WHERE content_level >= 1 AND posted_count = 0 ORDER BY RANDOM() LIMIT 1"
-    )
-    row = cur.fetchone()
+    """从已审核的 VPN / 代理主题素材池发帖。"""
+    row = db.execute(
+        "SELECT id, local_path, caption FROM media_items WHERE topic_score >= 2 AND posted_count = 0 AND caption IS NOT NULL AND TRIM(caption) != '' ORDER BY RANDOM() LIMIT 1"
+    ).fetchone()
     if not row:
-        print(f"  [{account['handle']}] no media available, skip post")
+        print(f"  [{account['handle']}] no approved VPN topic media, skip post")
         return
-    media_id, media_path = row
-    caption = random.choice([
-        "Late night vibes 🌙", "Mood today ✨", "Just saying hi", "Feeling cute ✨",
-        "Hello world", "Vibes only", "What do you think?", "DMs open 💌",
-    ])
-
+    media_id, media_path, caption = row
     await page.goto("https://x.com/compose/post")
     await asyncio.sleep(random.uniform(2, 4))
     await humanized_type(page, '[data-testid="tweetTextarea_0"]', caption)
-    await asyncio.sleep(random.uniform(1, 3))
-
     file_input = page.locator('input[type="file"]').first
     await file_input.set_input_files(media_path)
     await asyncio.sleep(random.uniform(3, 7))
-
     await jitter_click(page, '[data-testid="tweetButton"]')
     await asyncio.sleep(random.uniform(3, 8))
-
     db.execute("UPDATE media_items SET posted_count = posted_count + 1 WHERE id = ?", (media_id,))
     db.commit()
+    print(f"  [{account['handle']}] posted approved VPN topic media {media_id}")
     print(f"  [{account['handle']}] posted tweet with media {media_id}")
 
 
 async def action_follow_required(page: Page, account: dict, db: sqlite3.Connection):
     cur = db.execute(
-        "SELECT handle FROM creators WHERE follow_priority >= 8 AND handle NOT IN (SELECT target_handle FROM follow_log WHERE account = ?) ORDER BY RANDOM() LIMIT 1",
+        "SELECT handle FROM creators WHERE topic_score >= 2 AND follow_priority >= 8 AND handle NOT IN (SELECT target_handle FROM follow_log WHERE account = ?) ORDER BY RANDOM() LIMIT 1",
         (account["handle"],),
     )
     row = cur.fetchone()
@@ -265,7 +254,7 @@ async def action_follow_required(page: Page, account: dict, db: sqlite3.Connecti
 async def action_follow_random(page: Page, account: dict, db: sqlite3.Connection):
     n = random.randint(1, 3)
     cur = db.execute(
-        "SELECT handle FROM creators WHERE follow_priority < 8 AND handle NOT IN (SELECT target_handle FROM follow_log WHERE account = ?) ORDER BY RANDOM() LIMIT ?",
+        "SELECT handle FROM creators WHERE topic_score >= 2 AND follow_priority < 8 AND handle NOT IN (SELECT target_handle FROM follow_log WHERE account = ?) ORDER BY RANDOM() LIMIT ?",
         (account["handle"], n),
     )
     targets = [r[0] for r in cur.fetchall()]
@@ -284,30 +273,32 @@ async def action_follow_random(page: Page, account: dict, db: sqlite3.Connection
             await page.mouse.wheel(0, random.randint(500, 1500))
             await asyncio.sleep(random.uniform(3, 10))
 
-
 async def action_scroll_and_engage(page: Page, account: dict, db: sqlite3.Connection):
     await page.goto("https://x.com/home")
-    duration = random.uniform(60, 180)
+    duration = 0 if DRY_RUN else random.uniform(60, 180)
     end = time.time() + duration
     while time.time() < end:
         await page.mouse.wheel(0, random.randint(300, 800))
-        await asyncio.sleep(random.uniform(1.5, 5))
-        if random.random() < 0.10:
-            tweets = await page.locator('article[data-testid="tweet"]').all()
-            if tweets:
-                t = random.choice(tweets)
-                like = t.locator('[data-testid="like"]').first
-                try:
-                    if await like.is_visible():
-                        await like.click()
-                        await asyncio.sleep(random.uniform(0.5, 2))
-                        print(f"  [{account['handle']}] liked a tweet")
-                except Exception:
-                    pass
+        await asyncio.sleep(0 if DRY_RUN else random.uniform(1.5, 5))
+        if random.random() >= 0.10:
+            continue
+        tweets = await page.locator('article[data-testid="tweet"]').all()
+        if not tweets:
+            continue
+        tweet = random.choice(tweets)
+        try:
+            result = match_topic(await tweet.inner_text())
+            like = tweet.locator('[data-testid="like"]').first
+            if result.relevant and await like.is_visible():
+                await like.click()
+                await asyncio.sleep(random.uniform(0.5, 2))
+                print(f"  [{account['handle']}] liked VPN/proxy topic: {', '.join(result.matched_terms)}")
+        except Exception:
+            pass
 
 
 async def action_idle(page: Page, account: dict, db: sqlite3.Connection):
-    duration = random.uniform(30, 300)
+    duration = 0 if DRY_RUN else random.uniform(30, 300)
     print(f"  [{account['handle']}] idling for {duration:.0f}s")
     await asyncio.sleep(duration)
 
@@ -422,18 +413,13 @@ def init_schema(db_path: str = DB_PATH):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS creators (
-            handle TEXT PRIMARY KEY,
-            followers INTEGER,
-            bio TEXT,
-            nsfw_score REAL,
-            follow_priority INTEGER DEFAULT 5
+            handle TEXT PRIMARY KEY, followers INTEGER, bio TEXT,
+            topic_score REAL NOT NULL DEFAULT 0, follow_priority INTEGER DEFAULT 5
         );
         CREATE TABLE IF NOT EXISTS media_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            local_path TEXT UNIQUE,
-            content_level INTEGER,
-            nsfw_labels TEXT,
-            posted_count INTEGER DEFAULT 0
+            id INTEGER PRIMARY KEY AUTOINCREMENT, local_path TEXT UNIQUE,
+            content_level INTEGER, topic_score REAL NOT NULL DEFAULT 0,
+            caption TEXT, posted_count INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS follow_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,7 +428,7 @@ def init_schema(db_path: str = DB_PATH):
             ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    conn.commit()
+    ensure_topic_schema(conn)
     conn.close()
 
 
@@ -475,9 +461,7 @@ async def dry_run_walkthrough():
     print("  python 05-full-warmup-loop.py --live")
     print("And only after you have:")
     print("  1) AdsPower running locally with profiles configured")
-    print("  2) accounts table populated in warmup.db")
-    print("  3) media_items table populated (run example 02 first)")
-    print("  4) creators table populated (run example 01 first)")
+    print("  3) topic_score >= 2 的 VPN / 代理账号与素材已审核入库")
     print("  5) Reviewed and accepted the legal/ToS risks in LICENSE")
     print("=" * 60)
 

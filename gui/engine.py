@@ -1,161 +1,24 @@
-"""
-gui/engine.py · Background scheduler + simplified actions
-
-Simplified action set:
-  - scroll_engage   scroll the home feed for a random duration,
-                    use NudeNet to identify adult content before liking
-  - idle            do nothing (true idle, models human noise)
-
-NudeNet integration: when a tweet has media, screenshot the tweet element,
-run NudeNet to detect if it's adult content. Only like if NSFW score exceeds
-threshold. This builds the account's interest profile toward adult content.
-"""
+"""VPN / 代理工具方向的 X 账号调度：刷首页、主题筛选后点赞、idle。"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import random
-import tempfile
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from . import db
 from .adspower import BrowserClient, browser_session
 
-
-# ============================================================================
-# NudeNet lazy loader (only loads model once, on first use)
-# ============================================================================
-_nudenet_detector = None
-_nudenet_available = None
-
-NSFW_LABELS = {
-    "FEMALE_BREAST_EXPOSED",
-    "FEMALE_GENITALIA_EXPOSED",
-    "FEMALE_GENITALIA_COVERED",
-    "MALE_GENITALIA_EXPOSED",
-    "BUTTOCKS_EXPOSED",
-    "ANUS_EXPOSED",
-}
-
-SUGGESTIVE_LABELS = {
-    "FEMALE_BREAST_COVERED",
-    "BUTTOCKS_COVERED",
-    "BELLY_EXPOSED",
-}
+from topic import match_topic, parse_keywords
 
 
-def _get_nudenet():
-    """Lazy-load NudeNet detector. Returns None if not installed."""
-    global _nudenet_detector, _nudenet_available
-    if _nudenet_available is False:
-        return None
-    if _nudenet_detector is not None:
-        return _nudenet_detector
-    try:
-        from nudenet import NudeDetector
-        _nudenet_detector = NudeDetector()
-        _nudenet_available = True
-        log.info("NudeNet model loaded")
-        return _nudenet_detector
-    except ImportError:
-        log.warning("nudenet not installed — liking without NSFW filter. pip install nudenet to enable.")
-        _nudenet_available = False
-        return None
-    except Exception as e:
-        log.warning(f"NudeNet init failed: {e}")
-        _nudenet_available = False
-        return None
-
-
-# ============================================================================
-# NSFW keywords in tweet text (covers pure-text + video tweets)
-# ============================================================================
-NSFW_KEYWORDS = {
-    "#nsfw", "#lewd", "#porn", "#hentai", "#r18", "#xxx", "#adult",
-    "#onlyfans", "#fansly", "#nude", "#naked", "#sexy", "#erotic",
-    "#boobs", "#ass", "#dick", "#pussy", "#cum", "#milf", "#bbw",
-    "#feet", "#footfetish", "#bdsm", "#kink", "#lingerie", "#bikini",
-    "#cosplay", "#ahegao", "#waifu", "#ecchi",
-    "onlyfans.com", "fansly.com", "linktree", "linktr.ee",
-    "18+", "🔞", "🍑", "🍆", "💦",
-}
-
-
-def _text_has_nsfw_signals(text: str) -> bool:
-    """Quick keyword check on tweet text. Fast, no ML needed."""
-    text_lower = text.lower()
-    return any(kw in text_lower for kw in NSFW_KEYWORDS)
-
-
-async def is_nsfw_tweet(page, tweet_locator, threshold: float = 0.35) -> bool:
-    """Multi-signal NSFW detection for a single tweet.
-
-    Signal 1: Text keywords (#nsfw, #lewd, onlyfans.com, etc.)
-    Signal 2: NudeNet on tweet screenshot (captures image + video thumbnail)
-
-    Returns True if adult content detected (should like), False otherwise (skip).
-    If NudeNet is not available, falls back to text-only detection.
-    """
-
-    # --- Signal 1: Text keywords (fast, always works) ---
-    try:
-        tweet_text = await tweet_locator.inner_text()
-        if _text_has_nsfw_signals(tweet_text):
-            return True
-    except Exception:
-        tweet_text = ""
-
-    # --- Signal 2: NudeNet on screenshot (covers images + video thumbnails) ---
-    detector = _get_nudenet()
-    if detector is None:
-        # No NudeNet, no text match → skip (conservative without ML)
-        return False
-
-    try:
-        # Wait for media to load (video thumbnails / images need a moment)
-        await asyncio.sleep(random.uniform(0.5, 1.5))
-
-        # Try to wait for any img/video inside the tweet to finish loading
-        try:
-            media = tweet_locator.locator('img[src*="pbs.twimg.com"], video')
-            if await media.count() > 0:
-                await media.first.wait_for(state="visible", timeout=3000)
-                await asyncio.sleep(0.5)  # extra buffer for render
-        except Exception:
-            pass  # no media or timeout, proceed with screenshot anyway
-
-        # Screenshot the tweet element
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-            tmp_path = f.name
-
-        await tweet_locator.screenshot(path=tmp_path)
-
-        # Run NudeNet in thread pool
-        results = await asyncio.to_thread(detector.detect, tmp_path)
-
-        # Clean up
-        try:
-            Path(tmp_path).unlink()
-        except Exception:
-            pass
-
-        # Check results
-        for r in results:
-            if r["class"] in NSFW_LABELS and r["score"] >= threshold:
-                return True
-            if r["class"] in SUGGESTIVE_LABELS and r["score"] >= 0.5:
-                return True
-
-        return False
-    except Exception as e:
-        log.debug(f"NSFW check failed: {e}")
-        # On error with text match, still return text result
-        return _text_has_nsfw_signals(tweet_text) if tweet_text else False
-
+async def is_topic_tweet(tweet_locator, keywords=()):
+    """只检查推文正文；无法读取或无正文时跳过，避免把昵称当作内容。"""
+    text = await tweet_locator.locator('[data-testid="tweetText"]').inner_text()
+    return match_topic(text, keywords)
 
 log = logging.getLogger("x-warmup.engine")
 
@@ -174,6 +37,7 @@ class EngineSettings:
         self.like_prob = float(settings.get("like_probability", "0.10"))
         self.max_concurrent = int(settings.get("max_concurrent", "1"))
         self.dry_run = settings.get("dry_run", "true").lower() == "true"
+        self.topic_keywords = parse_keywords(settings.get("topic_keywords", ""))
         # Support both old "adspower_api" key and new "browser_api" key
         self.adspower_api = settings.get("browser_api",
                             settings.get("adspower_api", "http://127.0.0.1:54345"))
@@ -211,7 +75,7 @@ async def action_scroll_engage(page, account: dict, settings: EngineSettings) ->
 
     scrolls = 0
     likes = 0
-    nsfw_skips = 0
+    topic_skips = 0
     while time.time() < end:
         # scroll down by a humanized random amount
         await page.mouse.wheel(0, random.randint(300, 800))
@@ -232,21 +96,20 @@ async def action_scroll_engage(page, account: dict, settings: EngineSettings) ->
                     t = random.choice(tweets)
                     like = t.locator('[data-testid="like"]').first
                     if await like.is_visible():
-                        # NudeNet check: only like if adult content detected
-                        is_nsfw = await is_nsfw_tweet(page, t)
-                        if is_nsfw:
+                        result = await is_topic_tweet(t, settings.topic_keywords)
+                        if result.relevant:
                             await like.click()
                             likes += 1
                             await asyncio.sleep(random.uniform(2.0, 6.0))
-                            db.log_event("点赞", f"@{account['handle']} 识别到成人内容，已点赞", account["handle"])
+                            db.log_event("点赞", f"@{account['handle']} VPN/代理主题命中 {', '.join(result.matched_terms)}，已点赞", account["handle"])
                         else:
-                            nsfw_skips += 1
-                            db.log_event("跳过", f"@{account['handle']} 非成人内容，已跳过", account["handle"])
+                            topic_skips += 1
+                            db.log_event("跳过", f"@{account['handle']} 非 VPN/代理主题，已跳过", account["handle"])
                             await asyncio.sleep(random.uniform(1.0, 3.0))
             except Exception as e:
                 log.debug(f"like attempt failed: {e}")
 
-    return {"action": "scroll_engage", "scrolls": scrolls, "likes": likes, "skipped_non_nsfw": nsfw_skips, "duration_s": round(duration, 1)}
+    return {"action": "scroll_engage", "scrolls": scrolls, "likes": likes, "skipped_off_topic": topic_skips, "duration_s": round(duration, 1)}
 
 
 async def action_idle(page, account: dict, settings: EngineSettings) -> dict:
@@ -297,7 +160,7 @@ async def warmup_one(account: dict, settings: EngineSettings) -> None:
             action = pick_action()
             result = await action(page, account, settings)
             db.mark_warmup_done(handle)
-            db.log_event("完成养号", f"@{handle} · 滚动{result.get('scrolls',0)}次 · 点赞{result.get('likes',0)}次 · 跳过{result.get('skipped_non_nsfw',0)}条 · {result.get('duration_s',0)}秒", handle)
+            db.log_event("完成养号", f"@{handle} · 滚动{result.get('scrolls',0)}次 · 点赞{result.get('likes',0)}次 · 跳过{result.get('skipped_off_topic',0)}条 · {result.get('duration_s',0)}秒", handle)
     except Exception as e:
         log.exception("养号出错")
         db.log_event("出错", f"@{handle} · {type(e).__name__}: {e}", handle)

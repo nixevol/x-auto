@@ -14,6 +14,7 @@ import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
+from topic import ensure_topic_schema
 
 
 # ============================================================================
@@ -86,6 +87,7 @@ def init_schema() -> None:
     c = _conn()
     c.executescript(SCHEMA_SQL)
     _migrate_drop_password()
+    ensure_topic_schema(c)
 
 
 def _migrate_drop_password() -> None:
@@ -121,6 +123,7 @@ DEFAULT_SETTINGS = {
     "like_probability": "0.03",
     "max_concurrent": "1",
     "dry_run": "true",
+    "topic_keywords": "",
     "browser_api": "http://127.0.0.1:54345",
     "browser_type": "bitbrowser",
     "running": "false",

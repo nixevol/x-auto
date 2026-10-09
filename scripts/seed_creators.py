@@ -2,21 +2,17 @@
 """
 X Warmup Skill · Seed Creators Table
 
-Populate the creators table from a list of handles. This is what the warmup
-loop pulls from when doing follow_random / follow_required actions.
-
-This script does NOT download media — it only registers handles. To actually
-fetch media for the media_items table, run example 02 (nudenet-classify) on
-media you've downloaded via gallery-dl.
+Populate the VPN / proxy topic creator pool. Only creators with topic_score >= 2
+are eligible for follow actions in the full loop.
 
 Usage:
     # From a file, one handle per line
     python scripts/seed_creators.py --from-file handles.txt
 
     # From stdin (paste + Ctrl-D)
-    echo "alice_cute
-    bob_xx
-    carol_nsfw" | python scripts/seed_creators.py
+    echo "vpn_news
+    wireguard_dev
+    clash_verge" | python scripts/seed_creators.py
 
     # Single handle from CLI
     python scripts/seed_creators.py --handle alice_cute --priority 9
@@ -28,9 +24,9 @@ Usage:
     python scripts/seed_creators.py --from-file pool.txt --priority 5
 
 Input format (one handle per line):
-    alice_cute
-    @bob_xx            # @ is stripped
-    carol_nsfw # notes  # anything after # is notes
+    vpn_news
+    @wireguard_dev       # @ is stripped
+    clash_verge # notes  # anything after # is notes
     # this is a comment
 """
 
@@ -47,7 +43,7 @@ CREATE TABLE IF NOT EXISTS creators (
     handle TEXT PRIMARY KEY,
     followers INTEGER,
     bio TEXT,
-    nsfw_score REAL,
+    topic_score REAL NOT NULL DEFAULT 0,
     follow_priority INTEGER DEFAULT 5,
     notes TEXT,
     discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -113,6 +109,8 @@ def main():
     parser.add_argument("--from-file", help="file with one handle per line")
     parser.add_argument("--priority", type=int, default=5,
                         help="follow_priority 1-10 (default 5; use 8+ for required follows)")
+    parser.add_argument("--topic-score", type=float, default=2.0,
+                        help="verified VPN/proxy relevance score; >=2 enables follow (default 2)")
     parser.add_argument("--dry-run", action="store_true",
                         help="show what would be inserted without writing")
     args = parser.parse_args()
@@ -142,16 +140,17 @@ def main():
         if existing:
             conn.execute(
                 """UPDATE creators
-                   SET follow_priority = ?,
+                   SET follow_priority = ?, topic_score = ?,
                        notes = COALESCE(NULLIF(?, ''), notes)
                    WHERE handle = ?""",
-                (args.priority, note, handle),
+                (args.priority, args.topic_score, note, handle),
             )
             updated += 1
         else:
             conn.execute(
-                """INSERT INTO creators (handle, follow_priority, notes) VALUES (?, ?, ?)""",
-                (handle, args.priority, note),
+                """INSERT INTO creators (handle, topic_score, follow_priority, notes)
+                   VALUES (?, ?, ?, ?)""",
+                (handle, args.topic_score, args.priority, note),
             )
             inserted += 1
 
