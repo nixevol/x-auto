@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import os
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -124,8 +125,8 @@ DEFAULT_SETTINGS = {
     "max_concurrent": "1",
     "dry_run": "true",
     "topic_keywords": "",
-    "browser_api": "http://127.0.0.1:54345",
-    "browser_type": "bitbrowser",
+    "browser_api": os.getenv("BROWSER_API", "http://127.0.0.1:54345"),
+    "browser_type": os.getenv("BROWSER_TYPE", "bitbrowser"),
     "running": "false",
 }
 

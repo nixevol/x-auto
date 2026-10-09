@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 #
-# X NSFW Warmup Skill — production image
+# X VPN / proxy topic runtime image
 #
 # Multi-stage build:
 #   Stage 1 (builder): install deps + playwright browsers
@@ -45,8 +45,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
-
+COPY gui/requirements.txt ./gui/requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt && pip install -r gui/requirements.txt
 # 预装 Playwright Chromium（放 builder 里，否则运行时下载慢）
 RUN playwright install --with-deps chromium
 
@@ -88,9 +88,13 @@ COPY --chown=warmup:warmup SKILL.md README.md LICENSE requirements.txt AI-AGENT-
 COPY --chown=warmup:warmup examples/ ./examples/
 COPY --chown=warmup:warmup workflows/ ./workflows/
 COPY --chown=warmup:warmup tools-catalog.md ./
+COPY --chown=warmup:warmup gui/ ./gui/
+COPY --chown=warmup:warmup topic.py ./topic.py
 COPY --chown=warmup:warmup deploy/scripts/ ./scripts/
 
 USER warmup
+
+EXPOSE 8080
 
 # 健康检查 —— 跑 dry-run 看能不能起来
 HEALTHCHECK --interval=5m --timeout=60s --start-period=30s --retries=3 \

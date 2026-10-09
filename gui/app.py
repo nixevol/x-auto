@@ -388,11 +388,12 @@ if __name__ in {"__main__", "__mp_main__"}:
     print("关闭这个终端窗口 = 停止面板")
     print()
 
+    import os
     ui.run(
-        host="127.0.0.1",
-        port=8080,
+        host=os.getenv("GUI_HOST", "127.0.0.1"),
+        port=int(os.getenv("GUI_PORT", "8080")),
         title="X 养号工具",
         favicon="🦞",
         reload=False,
-        show=True,
+        show=os.getenv("GUI_SHOW_BROWSER", "false").lower() == "true",
     )

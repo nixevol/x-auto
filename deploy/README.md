@@ -49,3 +49,16 @@ AI 可以审查配置、解释脱敏日志和帮助准备 dry-run；生产常驻
 - [ ] Docker/systemd 的实际路径、挂载和数据库位置已核对。
 - [ ] 主题评分、caption 和授权门槛已有测试记录。
 - [ ] 备份和停止方式已验证。
+
+## GUI Docker 部署
+
+镜像现在包含 NiceGUI 和 `gui/` 代码，compose 会额外启动 `gui` 服务：
+
+```bash
+docker compose -f deploy/docker-compose.yml build gui
+docker compose -f deploy/docker-compose.yml up -d gui bitbrowser-bridge adspower-bridge
+```
+
+面板仅绑定宿主机 `127.0.0.1:8080`。容器内默认通过 `BROWSER_API` 访问宿主机 BitBrowser bridge；也可在 GUI 设置中切换到 AdsPower。
+
+Windows Docker Desktop 的限制：Local API 的 profile 列表通常可以通过 bridge 访问，但浏览器启动后返回的 CDP WebSocket 可能仍指向宿主机 `127.0.0.1` 和动态端口，容器无法直接回连。因此 Docker 中的 GUI 不能保证正常接管宿主机指纹浏览器。需要真实操作时，优先在 Windows 主机运行 GUI；或者把 GUI、指纹浏览器和 API 放在同一台 Linux 主机/同一网络中，并确认 CDP 地址对容器可达。

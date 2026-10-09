@@ -54,6 +54,50 @@ services:
         condition: service_started
 
   # ---------------------------------------------------------------------------
+  # GUI：本地面板，宿主浏览器通过 host.docker.internal 提供 API
+  # ---------------------------------------------------------------------------
+  gui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: x-warmup:latest
+    container_name: x-warmup-gui
+    restart: unless-stopped
+    environment:
+      GUI_HOST: 0.0.0.0
+      GUI_PORT: 8080
+      GUI_SHOW_BROWSER: "false"
+      X_WARMUP_DB: /app/data/warmup.db
+      BROWSER_API: http://bitbrowser-bridge:54345
+      BROWSER_TYPE: bitbrowser
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ../data:/app/data
+      - ../logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      adspower-bridge:
+        condition: service_started
+      bitbrowser-bridge:
+        condition: service_started
+
+  # BitBrowser Local API 桥接
+  bitbrowser-bridge:
+    image: alpine/socat:latest
+    container_name: bitbrowser-bridge
+    restart: unless-stopped
+    command:
+      - TCP-LISTEN:54345,fork,reuseaddr
+      - TCP:host.docker.internal:54345
+    networks:
+      - warmup-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ---------------------------------------------------------------------------
   # AdsPower Local API 桥接 —— 如果 AdsPower 装在宿主机上，用这个转发
   # 如果用 patchright 方案（不要 AdsPower），把这段删掉
   # ---------------------------------------------------------------------------
