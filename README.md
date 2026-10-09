@@ -28,6 +28,37 @@ bash scripts/launch_gui.sh
 
 面板地址为 `http://localhost:8080`。先保持 dry-run，导入自己有权运营的账号。命令行账号导入入口是 `scripts/onboard.py`，完整循环演练入口是 `python examples/05-full-warmup-loop.py --dry-run`。
 
+## 一键搭建与运行
+
+### Windows 本机运行（推荐配合宿主机指纹浏览器）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_local_windows.ps1
+```
+
+脚本会创建 `.venv`、安装依赖、安装 Chromium、编译检查，并把 GUI 注册为当前用户计划任务。面板地址为 `http://127.0.0.1:8080`。停止面板：
+
+```powershell
+Stop-ScheduledTask -TaskName "X VPN Warmup GUI"
+```
+
+### Linux / macOS 本机运行
+
+```bash
+bash scripts/setup_local.sh
+bash scripts/launch_gui.sh
+```
+
+### Docker 运行
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_docker_windows.ps1
+```
+
+或在 Linux/macOS 执行 `bash scripts/start_docker.sh`。Docker 面板仍是 `http://127.0.0.1:8080`；默认 dry-run，不会自动登录或执行真实 X 操作。
+
+测试账号密码不写入项目。已导入凭据库的条目名为 `X测试账号-EmilyCastrsdz5` 和 `X测试账号-BrianWheelyctr`，实际使用应先在 AdsPower/BitBrowser 中手动登录并创建 profile，再在 GUI 的“指纹浏览器”页面导入 profile。
+
 GUI 只执行 **scroll_engage（刷 X 首页 + 主题相关内容的可选点赞）和 idle**；不会新增主题搜索动作，也不负责采集、发帖、关注或取关。模拟运行并不证明真实平台操作可用。
 
 ## 主题迁移约定与实现状态

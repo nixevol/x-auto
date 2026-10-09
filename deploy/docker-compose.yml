@@ -73,6 +73,7 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "127.0.0.1:8080:8080"
+    command: ["python", "-X", "utf8", "gui/app.py"]
     volumes:
       - ../data:/app/data
       - ../logs:/app/logs
